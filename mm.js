@@ -1,19 +1,46 @@
 
-(function(_global, factory) {
-    _global.$ = factory();
+(function(__global, factory) {
+    console.log(__global)
+    __global.$ = factory();
 })(typeof window === undefined ? this : window, function() {
 
 "use strict";
 
 var support = {};
-var view = typeof window === undefined ? this : window;
-var doc = view.document;
+var _global = typeof window === undefined ? this : window;
+var doc = _global.document;
 var docElem = doc.documentElement;
 
 
 
-function getElementById(element) {
-    return doc.getElementById(element);
+function createElement(tagName) {
+    var el = doc.createElement(tagName);
+    return el;
+}
+
+
+// from jQuery
+function assert (fn) {
+    // local `documentElement`
+    var _docElem = createElement("fieldset");
+    try {
+        return !!fn( docElem );
+    } catch (e) {
+        return false;
+    } finally {
+        // Remove from its parent by default
+        removeChild(docElem);
+
+        // release memory in IE
+        _docElem = null;
+    }
+}
+
+
+
+function getElementById(el) {
+    // we can also get element by id from `globalView` like => this["" + element_id + ""]
+    return doc.getElementById(el) || _global[ el ];
 }
 
 function getElementsByTagName(parent, elements) {
@@ -181,12 +208,14 @@ function once (fn) {
 function addEventListener (el, eventName, handler) {
     if (el) {
         if (el.addEventListener) {
-            el.addEventListener(eventName, handler, true);
+            el.addEventListener(eventName, handler, false);
+        // IE
         } else if (el.attachEvent) {
             el.attachEvent( "on" + eventName, handler );
+        // normal way to add event
         } else {
-            el[ "on" + eventName ] = function() {
-                handler();
+            el[ "n" + eventName ] = function(e) {
+                handler.call(this, e);
             };
         }
     }
@@ -195,6 +224,32 @@ function addEventListener (el, eventName, handler) {
 
 
 putM({
+
+    fullScreen: function() {
+        var el = this.get(0);
+        if ('requestFullscreen' in el && isFunc( el.requestFullscreen )) {
+            el.requestFullscreen();
+        } else if ('webkitRequestFullscreen' in el && isFunc( el.webkitRequestFullscreen )) {
+            el.webkitRequestFullscreen();
+        } else if ('mozRequestFullscreen' in el && isFunc( el.mozRequestFullscreen )) {
+            el.mozRequestFullscreen();
+        } else if ('msRequestFullscreen' in el && isFunc( el.msRequestFullscreen )) {
+            el.msRequestFullscreen();
+        }
+    },
+
+    exitFullscreen: function() {
+        if (doc.exitFullscreen) {
+            doc.exitFullscreen();
+        } else if (doc.msExitFullscreen) {
+            doc.msExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+            doc.mozCancelFullScreen();
+        } else if (doc.webkitCancelFullScreen) {
+            doc.webkitCancelFullScreen();
+        }
+    },
+
     each: function(callback) {
         each(this.elements, function(index, element) {
             callback.apply(createOneSelector(element), index, element);
@@ -202,9 +257,16 @@ putM({
     },
     on: function(nameEvent, keyCode, callback) {
         var el = this.get(0);
-        var call = () => (isFunc(keyCode) ? keyCode: callback ).call(null, event);
+        var call = function () {
+            (isFunc(keyCode) ? keyCode: callback ).call(null, event);
+        };
 
-        function callFunctionEvent(event) {
+        function callFnEvent(event) {
+            event = event || _global.event;
+            var newEvent = {
+                x: event.clientX || event.x,
+                y: event.clientY || event.y,
+            };
 
             if (isFunc(keyCode)) {
                 call();
@@ -224,16 +286,15 @@ putM({
                 if (event.which === keyCode) {
                     call();
                 }
-                print(event)
             }
         }
 
         if (isArray(nameEvent)) {
             each(nameEvent, function(i, eventName) {
-                addEventListener(el, eventName, callFunctionEvent);
+                addEventListener(el, eventName, callFnEvent);
             });
         } else {
-            addEventListener(el, nameEvent, callFunctionEvent);
+            addEventListener(el, nameEvent, callFnEvent);
         }
     },
     once: function(eventName, keyCode, callback) {
@@ -285,15 +346,15 @@ function setStyle (el, name, value) {
 }
 
 function getStyles (el) {
-    var view = undefined;
-/*     print(element)
-    if (element && element.ownerDocument && element.ownerDocument.defaultView) {
-        view = element.ownerDocument.defaultView;
+    // from `https://stackoverflow.com/questions/9183555/whats-the-point-of-document-defaultview#:~:text=The%20document.,the%20code%20you%20are%20running.`
+    var view = (el.ownerDocument && el.ownerDocument.defaultView) ?
+                el.ownerDocument.defaultView : _global;
+
+    // get by `window.getComputedStyle`
+    if (view.getComputedStyle) {
+        return view.getComputedStyle(el);
+    } else if (el.currentStyle) {
     }
-    if (!view || !view.opener) {
-        view = window;
-    } */
-    return window.getComputedStyle(el);
 }
 
 
