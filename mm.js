@@ -1,73 +1,25 @@
 
 (function(__global, factory) {
-    console.log(__global)
-    __global.$ = factory();
-})(typeof window === undefined ? this : window, function() {
+    __global.$ = factory.call({});
+})(typeof window === "undefined" ? this : window, function() {
 
 "use strict";
 
 var support = {};
-var _global = typeof window === undefined ? this : window;
+var _global = typeof window !== "undefined" ? window : this;
 var doc = _global.document;
-var docElem = doc.documentElement;
+var docElem = doc.documentElement || doc.getElementsByTagName("html")[ 0 ] || doc.querySelectorAll("html")[ 0 ] || doc.querySelector("html");
 
 
-
-function createElement(tagName) {
-    var el = doc.createElement(tagName);
-    return el;
+function print(text) {
+    console.log(text);
 }
 
 
-// from jQuery
-function assert (fn) {
-    // local `documentElement`
-    var _docElem = createElement("fieldset");
-    try {
-        return !!fn( docElem );
-    } catch (e) {
-        return false;
-    } finally {
-        // Remove from its parent by default
-        removeChild(docElem);
-
-        // release memory in IE
-        _docElem = null;
-    }
-}
-
-
-
-function getElementById(el) {
-    // we can also get element by id from `globalView` like => this["" + element_id + ""]
-    return doc.getElementById(el) || _global[ el ];
-}
-
-function getElementsByTagName(parent, elements) {
-    parent = parent || doc;
-    return parent.getElementsByTagName(elements);
-}
-
-function getElementsByClassName(parent, elements) {
-    parent = parent || doc;
-    return parent.getElementsByClassName(elements);
-}
-
-function getElementsByName(elements) {
-    return doc.getElementsByName(elements);
-}
-
-
-
-/*
-  Main class which have all methods and all properties
-  default empty selector
-*/
 var Selector = function Selector() {
     /* default length */
     this.length = 0;
 };
-
 Selector.prototype.get = function(index) {
     return this[ index || 0 ];
 };
@@ -76,11 +28,166 @@ Selector.prototype.push = function(newElement) {
     this.length += 1;
 };
 
-function createOneElementSelector (element) {
+
+function timeout(fn, time) {
+    (_global || timers).setTimeout(fn, time || 0);
+}
+
+
+
+
+
+function createElement (tagName) {
+    var el = doc.createElement(tagName);
+    return el;
+}
+// remove node
+function removeNode (node) {
+    if (node.nodeType === TypeNodeDocument && doc.removeChild) {
+        doc.removeChild(node);
+    } else {
+        var parent = node.parentNode || node.parentElement;
+        if (parent && parent.removeChild) {
+            parent.removeChild(node);
+        } else  {
+            try {
+                node.remove();
+            } catch (e) {}
+        }
+    }
+}
+function appendNode (parent, node) {
+    parent.appendChild(node);
+}
+function setAttribute (el, name, value) {
+    if (el) {
+        if (el.setAttribute && isFunc( el.setAttribute )) {
+            el.setAttribute(name, value);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// from jQuery
+// you not need to remove your children which you created before because we will remove it for you
+function assert (fn) {
+    // local `document.documentElement`
+    var localDocElem = createElement("fieldset");
+
+    // we here work at background
+    // user should not see `local document`
+    setAttribute(localDocElem, "style", "display: none;opacity: 0;");
+    appendNode(docElem, localDocElem);
+
+    try {
+        return !!fn( localDocElem );
+    } catch (e) {
+        return false;
+    } finally {
+        // Remove from its parent by default
+        removeNode(localDocElem);
+
+        // release memory in IE
+        localDocElem = null;
+    }
+}
+
+
+support.querySelector = assert(function(local) {
+    var el_1 = createElement("input");
+    var el_2 = createElement("input");
+    appendNode(local, el_1);
+    appendNode(local, el_2);
+    return local.querySelector("input").value === "";
+});
+
+// create new id was not created yet
+function createUnsedId() {
+    var newId = "abc";
+    // check if element which have id like `newId` not exist
+    while ((newId in _global) || !!getElementById( newId )) {
+        newId = "abc" + Math.floor(Math.random() * 1000);
+    }
+    return newId;
+}
+
+support.getElementById = assert(function(local) {
+    var el = createElement("input");
+    var id = createUnsedId();
+    setAttribute(el, "value", "123");
+    setAttribute(el, "id", id);
+    appendNode(local, el);
+    var _el = doc.getElementById(id);
+    return _el.value === "123";
+});
+
+support.getElementsByTagName = assert(function(local) {
+    var el = createElement("input");
+    setAttribute(el, "value", "123");
+    setAttribute(el, "id", id);
+    appendNode(local, el);
+    var _el = doc.getElementById(id);
+    return _el.value === "123";
+});
+
+support.getElementsByTagName = assert(function(local) {
+    var el = createElement("input");
+    appendNode(local, el);
+    return local.getElementsByTagName("input").length;
+});
+
+
+// id maybe number `<input id="1">`
+// it can work so we will change id to string like => (1 => "1")
+function getElementById (el) {
+    el = el + "";
+    if (support.getElementById) {
+        return doc.getElementById(el);
+    } else if (support.querySelector) {
+        return doc.querySelector("#" + el);
+    }
+    // we can also get element by id from `globalView` like => (this["" + element_id + ""] || window["" + element_id + ""])
+    // may id is number we have to change to string
+    return  _global[ el ];
+}
+
+function getElementsByTagName (parent, tag) {
+    parent = parent || doc;
+    if (isNodeElement( parent ) || isNodeDocument( parent )) {
+        if (support.getElementsByTagName) {
+            return parent.getElementsByTagName(tag);
+        }
+    }
+}
+function getElementsByClassName (parent, tag) {
+    parent = parent || doc;
+    return parent.getElementsByClassName(tag);
+}
+function getElementsByName (elements) {
+    return doc.getElementsByName(elements);
+}
+
+
+
+
+function createOneElementSelector (el) {
     function ff() {}
     var self = new Selector();
-    self[ 0 ] = element;
-    self.length = 1;
+    self.push(el);
     return self;
 }
 
@@ -98,6 +205,13 @@ function each (array, callback) {
 }
 
 
+function charAt (string, index) {
+    return string[ index ];
+}
+function slice () {
+}
+
+
 function $(el) {
     var sel = new Selector();
 
@@ -111,8 +225,11 @@ function $(el) {
         return sel;
     }
 
-    var firstChar = el.charAt(0);
-    var name = el.slice(1);
+    var firstChar = charAt(el, 0);
+    var name = "";
+    for (var i = 1; i < el.length; i++) {
+        name += charAt(el, i);
+    }
     switch (firstChar) {
         case "#":
             sel.push(getElementById(name));
@@ -123,9 +240,12 @@ function $(el) {
             sel.length = elems.length;
             return sel;
         default:
-            var elems = getElementsByTagName(doc, name);
-            sel.length = elems.length;
-            return;
+            var elems = getElementsByTagName(doc, el);
+            var i = 0;
+            for (;i < elems.length; i++) {
+                sel.push(elems[ i ]);
+            }
+            return sel;
     }
 }
 
@@ -134,18 +254,20 @@ function $(el) {
 function putM(methods) {
     each(methods, function (name, method) {
         Selector.prototype[ name ] = function() {
-            if (isFunc(method)) {
-                var __args = arguments;
-                var self =  this;
+            var __args = arguments;
+            var self =  this;
+            if (isFunc( method )) {
+                // work with one element
                 if (self.length === 1) {
                     var elem = self.get(0);
                     var sel = createOneElementSelector( elem );
                     return method.apply(sel, __args);
                 }
-                each(self, function(_, element) {
-                    var sel = createOneElementSelector( element );
+                for (var i = 0; i < self.length; i++) {
+                    var el = self[ i ];
+                    var sel = createOneElementSelector( el );
                     method.apply(sel, __args);
-                });
+                }
             }
         };
     });
@@ -184,9 +306,7 @@ ButtonMouse["right"] = 2;
 
 
 
-var EventsKeyboard = "keydown|keyup|keypress".split('|');
-var EventsMouse = "mousemove|mouseenter|mousedown|mouseup|mouseout|mouseover".split('|');
-var KeysNN = "ctrl|alt|shift|meta".split('|');
+
 
 
 
@@ -204,17 +324,19 @@ function once (fn) {
 }
 
 
-
-function addEventListener (el, eventName, handler) {
+var fromParentToChild = true;
+var fromChildToParent = false;
+function addEventListener (el, eventName, handler, useCapture) {
+    useCapture = useCapture || false;
     if (el) {
         if (el.addEventListener) {
-            el.addEventListener(eventName, handler, false);
+            el.addEventListener(eventName, handler, useCapture);
         // IE
         } else if (el.attachEvent) {
-            el.attachEvent( "on" + eventName, handler );
+            el.attachEvent( "on" + eventName, handler, useCapture);
         // normal way to add event
         } else {
-            el[ "n" + eventName ] = function(e) {
+            el[ "on" + eventName ] = function(e) {
                 handler.call(this, e);
             };
         }
@@ -222,54 +344,133 @@ function addEventListener (el, eventName, handler) {
 }
 
 
+support.fullscreen = 'requestFullscreen' in docElem
+                   ||'webkitRequestFullscreen' in docElem
+                   ||'mozRequestFullscreen' in docElem
+                   ||'msRequestFullscreen' in docElem;
+
+// methods to controll `fullscreen` feature
+putM({
+    fullscreen: function (enter) {
+        // enter = enter || true;
+        var el = this.get(0);
+
+        // from `https://shaka-player-demo.appspot.com/docs/api/lib_polyfill_fullscreen.js.html`
+        var fullscreenElement = doc.fullscreenElement || doc.msFullscreenElement || doc.mozFullscreenElement || doc.webkitFullscreenElement;
+        var fullscreenEnabled = doc.fullscreenEnabled || doc.mozFullScreenEnabled || doc.msFullscreenEnabled || doc.webkitFullscreenEnabled;
+
+        if (support.fullscreen) {
+            if (enter && !fullscreenElement) {
+                if (isFunc( el.requestFullscreen )) {
+                    el.requestFullscreen();
+                } else if (isFunc( el.webkitRequestFullscreen )) {
+                    el.webkitRequestFullscreen();
+                } else if (isFunc( el.mozRequestFullscreen )) {
+                    el.mozRequestFullscreen();
+                } else if (isFunc( el.msRequestFullscreen )) {
+                    el.msRequestFullscreen();
+                }
+            } else {
+                if ('exitFullscreen' in doc && isFunc( doc.exitFullscreen )) {
+                    doc.exitFullscreen();
+                } else if ('msExitFullscreen' in doc && isFunc( doc.msExitFullscreen )) {
+                    doc.msExitFullscreen();
+                } else if ('mozCancelFullScreen' in doc && isFunc( doc.mozCancelFullScreen )) {
+                    doc.mozCancelFullScreen();
+                } else if ('webkitCancelFullScreen' in doc && isFunc( doc.webkitCancelFullScreen )) {
+                    doc.webkitCancelFullScreen();
+                }
+            }
+        }
+    },
+
+});
+
+
+
+
+
+function on (el, nameEvent, keyCode, callback) {
+
+}
+
+
+var EventsKeyboard = "keydown|keyup|keypress".split('|');
+var EventsMouse = "mousemove|mouseenter|mousedown|mouseup|mouseout|mouseover".split('|');
+var KeysNN = "ctrl|alt|shift|meta".split('|');
+
 
 putM({
-
-    fullScreen: function() {
-        var el = this.get(0);
-        if ('requestFullscreen' in el && isFunc( el.requestFullscreen )) {
-            el.requestFullscreen();
-        } else if ('webkitRequestFullscreen' in el && isFunc( el.webkitRequestFullscreen )) {
-            el.webkitRequestFullscreen();
-        } else if ('mozRequestFullscreen' in el && isFunc( el.mozRequestFullscreen )) {
-            el.mozRequestFullscreen();
-        } else if ('msRequestFullscreen' in el && isFunc( el.msRequestFullscreen )) {
-            el.msRequestFullscreen();
-        }
-    },
-
-    exitFullscreen: function() {
-        if (doc.exitFullscreen) {
-            doc.exitFullscreen();
-        } else if (doc.msExitFullscreen) {
-            doc.msExitFullscreen();
-        } else if (doc.mozCancelFullScreen) {
-            doc.mozCancelFullScreen();
-        } else if (doc.webkitCancelFullScreen) {
-            doc.webkitCancelFullScreen();
-        }
-    },
-
     each: function(callback) {
         each(this.elements, function(index, element) {
             callback.apply(createOneSelector(element), index, element);
         });
     },
-    on: function(nameEvent, keyCode, callback) {
+
+    // you can understand it from
+    //    `https://developer.mozilla.org/en-US/docs/Web/API/CSS_Object_Model/Determining_the_dimensions_of_elements`
+    // or `https://stackoverflow.com/questions/21064101/understanding-offsetwidth-clientwidth-scrollwidth-and-height-respectively`
+
+    offset: function() {
         var el = this.get(0);
-        var call = function () {
-            (isFunc(keyCode) ? keyCode: callback ).call(null, event);
+        return {
+            left: function() { return el.offsetLeft; },
+            top: function() { return el.offsetTop; },
+            width: function() { return el.offsetWidth; },
+            height: function() { return el.offsetHeight; },
+        };
+    },
+
+    realWidth: function() {
+        return this.get(0).getBoundingClientRect().width;
+    },
+    realHeight: function() {
+        return this.get(0).getBoundingClientRect().height;
+    },
+
+    on: function (nameEvent, keyCode, callback) {
+        var el = this.get(0);
+        var self = this;
+        var rect = el.getBoundingClientRect();
+        var call = function (_event_) {
+            (isFunc(keyCode) ? keyCode: callback ).call(null, _event_);
         };
 
-        function callFnEvent(event) {
-            event = event || _global.event;
+        // when call event
+        function callFnEvent (ev) {
+            var _event = ev || _global.event;
+            var clientX = _event.clientX || _event.x;
+            var clientY = _event.clientY || _event.y;
             var newEvent = {
-                x: event.clientX || event.x,
-                y: event.clientY || event.y,
+                type: nameEvent,
+                target: _event.target,
+                ctrl: _event.ctrlKey,
+                alt: _event.altKey,
+                shift: _event.shiftKey,
+                stop: function() {
+                    _event.stopPropagation();
+                },
+                restart: function() {
+                    _event.returnValue = false;
+                }
             };
 
+            if (_event instanceof KeyboardEvent && /^key/.test( nameEvent )) {
+                print(ev)
+                var code = _event.which || _event.keyCode || 0;
+                newEvent.code = code;
+
+            }
+
+            if (_event instanceof MouseEvent) {
+                newEvent.screenX = _event.screenX;
+                newEvent.screenY = _event.screenY;
+                newEvent.x = Math.floor((clientX - rect.left ) / ( rect.right - rect.left ) * self.offset().width());
+                newEvent.y = Math.floor((clientY - rect.top ) / ( rect.bottom - rect.top ) * self.offset().height());
+            }
+
             if (isFunc(keyCode)) {
-                call();
+                call(newEvent);
 
             } else if (isString(keyCode)) {
                 var keys = keyCode.split("+");
@@ -284,7 +485,7 @@ putM({
                 }
             } else if (isNumber(keyCode)) {
                 if (event.which === keyCode) {
-                    call();
+                    call(newEvent);
                 }
             }
         }
@@ -297,12 +498,10 @@ putM({
             addEventListener(el, nameEvent, callFnEvent);
         }
     },
+
+    emit: function (eventName) {},
+
     once: function(eventName, keyCode, callback) {
-        var self = this;
-        function fn() {
-            self.on(eventName, keyCode, callback);
-        }
-        fn();
     },
     click: function(keyCode, callback) {
         this.on("click", keyCode, callback);
@@ -359,10 +558,14 @@ function getStyles (el) {
 
 
 var TypeNodeElement = Node.ELEMENT_NODE || 1
+var TypeNodeDocument = Node.DOCUMENT_NODE || 9
 
 
 function isNodeElement (node) {
     return node.nodeType === TypeNodeElement;
+}
+function isNodeDocument (node) {
+    return node.nodeType === TypeNodeDocument;
 }
 
 
@@ -405,7 +608,6 @@ function addClass (el, cls) {
                     oldVal.push(_cls);
                     var newVal = oldVal.join(" ");
                     elem.attr("class", newVal);
-                    print(elem.attr("class"))
                 }
             }
         });
@@ -434,8 +636,8 @@ putM({
     },
 
     scale: function (x, y) {
-        if (isDef(y)) this.css("transform", `scaleX(${x}) scaleY(${x})`);
-        else this.css("transform", `scale(${x})`);
+        if (isDef(y)) { this.css("transform", "scaleX(${x}) scaleY(${x})"); }
+        else { this.css("transform", "scale(${x})"); }
     },
 
     hasClass: function (cls) {
@@ -528,7 +730,6 @@ putM({
     },
     attr: function (name, value) {
         var el = this.get(0);
-
         // return value of attribute by name
         if (isString(name) && isUndef(value)) {
             if (el.getAttribute && isFunc( el.getAttribute )) {
@@ -548,14 +749,12 @@ putM({
 
         // set new value for attribute
         } else {
-            if (el.setAttribute && isFunc( el.setAttribute )) {
-                if (isObject( name )) {
-                    each(name, function(_name, _value) {
-                        el.setAttribute(_name, _value);
-                    });
-                } else {
-                    el.setAttribute(name, value);
-                }
+            if (isObject( name )) {
+                each(name, function(_name, _value) {
+                    setAttribute(el, _name, _value);
+                });
+            } else {
+                setAttribute(el, name, value);
             }
         }
     },
@@ -577,23 +776,18 @@ putM({
 });
 
 
-function removeNode (node) {
-    if (node.parentNode) {
-        node.parentNode.removeChild(node);
-    } else {
-        node.remove();
-        try {
-        } catch (e) {}
-    }
-}
+
+
+
+
 
 
 putM({
     parent: function() {
         var el = this.get(0);
-        let parent = el.parentNode;
-        if (parent) return $(parent);
-        else return $(docElem);
+        let parent = el.parentNode || el.parentElement;
+        if (parent) { return $(parent); }
+        else { return $(docElem); }
     },
     remove: function() {
         var el = this.get(0);
@@ -601,13 +795,11 @@ putM({
     },
     empty: function() {
         var el = this.get(0);
-        print(el.childNodes)
-        for (const child = el.firstChild; el.firstChild; el = el.firstChild) {
-            print(child);
-            removeNode(child);
+        while (el.firstChild) {
+            removeNode(el.lastChild);
         }
         // try to make it empty
-        //this.html("");
+        this.html("");
     }
 });
 
@@ -616,7 +808,7 @@ putM({
 putM({
     hide: function (timeout) {
         if (isNumber(timeout) && timeout >= 0) {
-            setTimeout(() => this.hide(undefined), timeout);
+            timeout(function() { this.hide(undefined); }, timeout);
         } else {
             var display = this.css("display");
             this.data("display", display === "none" ? "block": display);
@@ -626,7 +818,7 @@ putM({
 
     show: function (timeout) {
         if (isNumber(timeout) && timeout >= 0) {
-            setTimeout(() => this.show(undefined), timeout);
+            timeout(function() { this.show(undefined); }, timeout);
         } else {
             var data = this.data("display");
             if (data != "") {
